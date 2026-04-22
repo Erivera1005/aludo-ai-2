@@ -120,7 +120,7 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       audio.onerror = () => setStatus("idle");
       await audio.play();
     } catch (err) {
-      console.error(err);
+      console.error("[VoiceChat] error:", err);
       toast.error("Algo salió mal, intenta de nuevo");
       setStatus("idle");
     }
