@@ -1,4 +1,5 @@
 import { corsHeaders } from "../_shared/cors.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -29,7 +30,7 @@ Deno.serve(async (req) => {
         model: "gpt-4o-mini-tts",
         voice,
         input: text,
-        speed: 1.15,
+        speed: 2.0,
         instructions: "Habla con un acento latinoamericano cálido, tierno y natural. Tono cariñoso y cercano.",
         response_format: "mp3",
       }),
@@ -44,14 +45,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Stream the binary mp3 directly to the client.
-    // ~33% smaller than base64 JSON + no decode work on the client => audio starts faster.
-    return new Response(response.body, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "audio/mpeg",
-        "Cache-Control": "no-store",
-      },
+    const buffer = await response.arrayBuffer();
+    const audioBase64 = base64Encode(new Uint8Array(buffer));
+
+    return new Response(JSON.stringify({ audio: audioBase64, mime: "audio/mpeg" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("tts error", e);

@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // decode base64 to bytes
+    // decode base64 to bytes in chunks
     const binary = atob(audio);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -28,10 +28,8 @@ Deno.serve(async (req) => {
       : "webm";
     const form = new FormData();
     form.append("file", new Blob([bytes], { type: inputMime }), `audio.${ext}`);
-    // gpt-4o-mini-transcribe is significantly faster than whisper-1
-    form.append("model", "gpt-4o-mini-transcribe");
+    form.append("model", "whisper-1");
     form.append("language", "es");
-    form.append("response_format", "json");
 
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
@@ -41,7 +39,7 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const t = await response.text();
-      console.error("Transcribe error", response.status, t);
+      console.error("Whisper error", response.status, t);
       return new Response(JSON.stringify({ error: "Error transcribiendo" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
