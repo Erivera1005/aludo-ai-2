@@ -27,8 +27,16 @@ const OnboardingForm = ({ slug, onCreated }: Props) => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.animal_type.trim() || !form.sex) {
-      toast.error("Nombre, tipo de animal y sexo son obligatorios");
+    if (
+      !form.name.trim() ||
+      !form.animal_type.trim() ||
+      !form.breed.trim() ||
+      !form.sex ||
+      !form.age.trim() ||
+      !form.owner_name.trim() ||
+      !form.owner_contact.trim()
+    ) {
+      toast.error("Por favor completa todos los campos (las alergias son opcionales)");
       return;
     }
     setSubmitting(true);
