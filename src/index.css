@@ -8,8 +8,22 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Aludo brand: deep navy #000637 */
+    --background: 230 100% 11%;
+    --foreground: 220 30% 96%;
+
+    --brand: 230 100% 11%;
+    --brand-deep: 230 100% 7%;
+    --accent-blue: 222 76% 52%;
+    --accent-blue-glow: 222 90% 65%;
+
+    --gradient-hero: radial-gradient(ellipse at center, hsl(230 80% 18%) 0%, hsl(230 100% 11%) 45%, hsl(230 100% 7%) 100%);
+    --gradient-mic: linear-gradient(135deg, hsl(222 76% 52%), hsl(222 90% 65%));
+    --shadow-mic: 0 20px 60px -15px hsl(222 90% 55% / 0.55), 0 0 0 1px hsl(222 90% 65% / 0.15);
+
+    --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+    --foreground-old: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -101,5 +115,51 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
   }
+  html, body, #root { height: 100%; }
+}
+
+@layer utilities {
+  .bg-hero { background: var(--gradient-hero); }
+  .bg-mic { background: var(--gradient-mic); }
+  .shadow-mic { box-shadow: var(--shadow-mic); }
+}
+
+@layer components {
+  /* Mic pulse rings */
+  .mic-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 2px solid hsl(var(--accent-blue-glow) / 0.5);
+    animation: mic-pulse 2s ease-out infinite;
+  }
+  .mic-ring.delay-1 { animation-delay: 0.6s; }
+  .mic-ring.delay-2 { animation-delay: 1.2s; }
+
+  @keyframes mic-pulse {
+    0%   { transform: scale(1);   opacity: 0.7; }
+    100% { transform: scale(2.2); opacity: 0;   }
+  }
+
+  @keyframes soft-pulse {
+    0%, 100% { transform: scale(1);    box-shadow: 0 20px 60px -15px hsl(222 90% 55% / 0.55); }
+    50%      { transform: scale(1.04); box-shadow: 0 25px 80px -10px hsl(222 90% 65% / 0.75); }
+  }
+  .animate-soft-pulse { animation: soft-pulse 1.6s ease-in-out infinite; }
+
+  @keyframes wave-bar {
+    0%, 100% { transform: scaleY(0.3); }
+    50%      { transform: scaleY(1);   }
+  }
+  .wave-bar { animation: wave-bar 0.9s ease-in-out infinite; transform-origin: center; }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-in-up { animation: fade-in-up 0.5s var(--transition-smooth) both; }
 }

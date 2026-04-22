@@ -14,6 +14,14 @@ export default {
     },
     extend: {
       colors: {
+        brand: {
+          DEFAULT: "hsl(var(--brand))",
+          deep: "hsl(var(--brand-deep))",
+        },
+        "accent-blue": {
+          DEFAULT: "hsl(var(--accent-blue))",
+          glow: "hsl(var(--accent-blue-glow))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
