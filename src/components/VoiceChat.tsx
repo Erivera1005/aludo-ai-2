@@ -86,6 +86,7 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       const { data: chat, error: cErr } = await supabase.functions.invoke("chat-pet", {
         body: { pet, messages: newHistory, slug },
       });
+      console.log("[chat-pet]", { chat, cErr });
       const usageStatus = (chat as { blocked?: boolean; usage?: { status?: string } } | null)?.usage?.status;
       const isBlocked = (chat as { blocked?: boolean } | null)?.blocked === true
         || (usageStatus && usageStatus !== "ok");
@@ -96,8 +97,10 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
         else onBlocked("daily");
         return;
       }
-      if (cErr || chat?.error) throw new Error(cErr?.message || chat?.error);
+      if (cErr) throw new Error(`chat-pet: ${cErr.message}`);
+      if (chat?.error) throw new Error(`chat-pet: ${chat.error}`);
       const reply: string = (chat?.reply || "").trim();
+      if (!reply) throw new Error("respuesta vacía del modelo");
       setHistory((h) => [...h, { role: "assistant", content: reply }]);
 
       setStatus("speaking");
@@ -105,7 +108,10 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       const { data: voice, error: vErr } = await supabase.functions.invoke("tts", {
         body: { text: reply, sex: pet.sex },
       });
-      if (vErr || voice?.error) throw new Error(vErr?.message || voice?.error);
+      console.log("[tts]", { hasAudio: !!voice?.audio, vErr, err: voice?.error });
+      if (vErr) throw new Error(`tts: ${vErr.message}`);
+      if (voice?.error) throw new Error(`tts: ${voice.error}`);
+      if (!voice?.audio) throw new Error("tts: sin audio");
 
       const audioUrl = `data:${voice.mime || "audio/mpeg"};base64,${voice.audio}`;
       const audio = new Audio(audioUrl);
@@ -114,7 +120,7 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       audio.onerror = () => setStatus("idle");
       await audio.play();
     } catch (err) {
-      console.error(err);
+      console.error("[VoiceChat] error:", err);
       toast.error("Algo salió mal, intenta de nuevo");
       setStatus("idle");
     }
