@@ -137,6 +137,7 @@ const Field = ({
   value,
   onChange,
   placeholder,
+  required,
 }: {
   label: string;
   value: string;
