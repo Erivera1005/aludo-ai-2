@@ -4,7 +4,7 @@ import { Mic, Square, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { clearPet, loadPet, type Pet } from "@/lib/petStorage";
 import { toast } from "sonner";
-import logo from "@/assets/logo.jpeg";
+import logo from "@/assets/logo.png";
 
 type Status = "idle" | "recording" | "processing" | "speaking";
 
@@ -153,30 +153,24 @@ const Voice = () => {
 
   return (
     <main className="min-h-screen bg-hero flex flex-col items-center justify-between px-5 py-10 relative">
-      <header className="w-full flex items-center justify-between max-w-md">
-        <img src={logo} alt="Aludo" className="h-10 w-auto select-none" draggable={false} />
+      <header className="w-full flex items-center justify-end max-w-md">
         <button
           onClick={reset}
-          className="text-foreground/50 hover:text-foreground/90 transition-colors p-2"
-          aria-label="Cambiar mascota"
+          className="text-foreground/60 hover:text-foreground/90 transition-colors text-xs font-medium flex items-center gap-1.5 px-3 py-2 rounded-full border border-foreground/15"
+          aria-label="Perfil de la mascota"
         >
-          <RotateCcw size={18} />
+          <RotateCcw size={14} />
+          Perfil de la mascota
         </button>
       </header>
 
-      <section className="flex-1 flex flex-col items-center justify-center w-full max-w-md">
-        {pet && (
-          <p className="text-foreground/70 text-sm mb-2 animate-fade-in-up">
-            Hablando con <span className="text-foreground font-medium">{pet.name}</span>
-          </p>
-        )}
-
-        <p
-          key={hint}
-          className="text-foreground/85 text-center text-base sm:text-lg leading-snug min-h-[3.5rem] mb-12 px-4 animate-fade-in-up"
-        >
-          {hint}
-        </p>
+      <section className="flex-1 flex flex-col items-center justify-center w-full max-w-md gap-16">
+        <img
+          src={logo}
+          alt="Aludo"
+          className="w-56 max-w-[70vw] h-auto select-none animate-fade-in-up"
+          draggable={false}
+        />
 
         <div className="relative w-44 h-44 flex items-center justify-center">
           {isRecording && (
