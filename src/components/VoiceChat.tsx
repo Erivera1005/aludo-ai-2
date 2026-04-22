@@ -238,9 +238,9 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
 
   return (
     <main className="min-h-screen bg-hero flex flex-col items-center justify-between px-5 py-10 relative">
-      <header className="w-full max-w-md" />
+      <header className="w-full max-w-md h-8" />
 
-      <section className="flex-1 flex flex-col items-center justify-center w-full max-w-md gap-16">
+      <section className="flex-1 flex flex-col items-center justify-center w-full max-w-md gap-20 -mt-4">
         <img
           src={logo}
           alt="Aludo"
