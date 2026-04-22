@@ -4,28 +4,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { loadPet, savePet, type Pet } from "@/lib/petStorage";
 import OnboardingForm from "@/components/OnboardingForm";
 import VoiceChat from "@/components/VoiceChat";
-import UsageBlocked from "@/components/UsageBlocked";
 import logo from "@/assets/logo.png";
 
 type State = "loading" | "create" | "ready";
-type Block = "daily" | "monthly" | "expired" | null;
 
 const PetSlug = () => {
   const { slug = "" } = useParams();
   const normalizedSlug = slug.trim();
   const [state, setState] = useState<State>("loading");
   const [pet, setPet] = useState<Pet | null>(null);
-  const [block, setBlock] = useState<Block>(null);
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
       if (!normalizedSlug) return;
+      // 1) Try local cache for instant load
       const cached = loadPet(normalizedSlug);
       if (cached) {
         setPet(cached);
         setState("ready");
       }
+      // 2) Always sync with backend (source of truth)
       const { data, error } = await supabase
         .from("pets")
         .select("*")
@@ -63,13 +62,11 @@ const PetSlug = () => {
     );
   }
 
-  if (block) return <UsageBlocked variant={block} />;
-
   if (state === "create") {
     return <OnboardingForm slug={normalizedSlug} onCreated={handleCreated} />;
   }
 
-  return <VoiceChat pet={pet!} slug={normalizedSlug} onBlocked={setBlock} />;
+  return <VoiceChat pet={pet!} />;
 };
 
 export default PetSlug;

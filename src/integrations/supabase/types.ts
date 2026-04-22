@@ -21,17 +21,12 @@ export type Database = {
           animal_type: string
           breed: string | null
           created_at: string
-          daily_usage_count: number
-          first_use_at: string | null
           id: string
-          is_blocked: boolean
-          last_used_date: string | null
           name: string
           owner_contact: string | null
           owner_name: string | null
           sex: string | null
           slug: string | null
-          usage_day_index: number
         }
         Insert: {
           age?: string | null
@@ -39,17 +34,12 @@ export type Database = {
           animal_type: string
           breed?: string | null
           created_at?: string
-          daily_usage_count?: number
-          first_use_at?: string | null
           id?: string
-          is_blocked?: boolean
-          last_used_date?: string | null
           name: string
           owner_contact?: string | null
           owner_name?: string | null
           sex?: string | null
           slug?: string | null
-          usage_day_index?: number
         }
         Update: {
           age?: string | null
@@ -57,17 +47,12 @@ export type Database = {
           animal_type?: string
           breed?: string | null
           created_at?: string
-          daily_usage_count?: number
-          first_use_at?: string | null
           id?: string
-          is_blocked?: boolean
-          last_used_date?: string | null
           name?: string
           owner_contact?: string | null
           owner_name?: string | null
           sex?: string | null
           slug?: string | null
-          usage_day_index?: number
         }
         Relationships: []
       }
@@ -76,7 +61,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      consume_pet_usage: { Args: { _slug: string }; Returns: Json }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
