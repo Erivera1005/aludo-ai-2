@@ -173,9 +173,22 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       const { data: chat, error: cErr } = await supabase.functions.invoke("chat-pet", {
         body: { pet, messages: newHistory, slug },
       });
-      const usageStatus = (chat as { blocked?: boolean; usage?: { status?: string } } | null)?.usage?.status;
-      const isBlocked = (chat as { blocked?: boolean } | null)?.blocked === true
-        || (usageStatus && usageStatus !== "ok");
+      // When the edge function returns 403, supabase-js puts the JSON body
+      // in `cErr.context` (a Response). Read it to detect block reasons.
+      let chatBody: { blocked?: boolean; usage?: { status?: string }; reply?: string; error?: string } | null =
+        (chat as typeof chatBody) ?? null;
+      if (cErr) {
+        try {
+          const ctx = (cErr as { context?: Response }).context;
+          if (ctx && typeof ctx.json === "function") {
+            chatBody = await ctx.clone().json();
+          }
+        } catch (e) {
+          console.warn("[VoiceChat] could not parse error body", e);
+        }
+      }
+      const usageStatus = chatBody?.usage?.status;
+      const isBlocked = chatBody?.blocked === true || (usageStatus && usageStatus !== "ok");
       if (isBlocked) {
         setStatus("idle");
         if (usageStatus === "expired") onBlocked("expired");
@@ -183,11 +196,11 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
         else onBlocked("daily");
         return;
       }
-      if (cErr || chat?.error) {
-        console.error("[VoiceChat] chat error", cErr, chat);
-        throw new Error(cErr?.message || chat?.error);
+      if (cErr || chatBody?.error) {
+        console.error("[VoiceChat] chat error", cErr, chatBody);
+        throw new Error((cErr as Error)?.message || chatBody?.error || "chat failed");
       }
-      const reply: string = (chat?.reply || "").trim();
+      const reply: string = (chatBody?.reply || "").trim();
       setHistory((h) => [...h, { role: "assistant", content: reply }]);
 
       setStatus("speaking");

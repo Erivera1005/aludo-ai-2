@@ -10,14 +10,14 @@ const UsageBlocked = ({ variant }: Props) => {
   const isExpired = variant === "expired";
   const title =
     variant === "daily"
-      ? "Has alcanzado el límite de hoy"
+      ? "Has alcanzado el límite de usos por hoy"
       : variant === "monthly"
       ? "Has alcanzado el límite del mes"
       : "Tu collar ha expirado";
 
   const message =
     variant === "daily"
-      ? "Vuelve mañana para seguir hablando con tu mascota."
+      ? "Vuelve mañana para seguir hablando con tu mascota. El contador se renueva automáticamente cada día."
       : variant === "monthly"
       ? "Tu ciclo mensual de uso terminó. Volverá a estar disponible próximamente."
       : "Han pasado 4 meses desde el primer uso. Para renovarlo, escríbenos por WhatsApp.";
