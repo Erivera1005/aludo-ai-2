@@ -1,4 +1,4 @@
-import { corsHeaders } from "@supabase/supabase-js/cors";
+import { corsHeaders } from "../_shared/cors.ts";
 
 interface PetData {
   name: string;
