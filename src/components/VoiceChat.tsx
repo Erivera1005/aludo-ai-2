@@ -8,9 +8,9 @@ import logo from "@/assets/logo.png";
 type Status = "idle" | "recording" | "processing" | "speaking";
 interface Msg { role: "user" | "assistant"; content: string }
 
-interface Props { pet: Pet }
+interface Props { pet: Pet; slug: string; onBlocked: (variant: "daily" | "monthly" | "expired") => void }
 
-const VoiceChat = ({ pet }: Props) => {
+const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
   const [status, setStatus] = useState<Status>("idle");
   const [history, setHistory] = useState<Msg[]>([]);
 
@@ -84,8 +84,18 @@ const VoiceChat = ({ pet }: Props) => {
       setHistory(newHistory);
 
       const { data: chat, error: cErr } = await supabase.functions.invoke("chat-pet", {
-        body: { pet, messages: newHistory },
+        body: { pet, messages: newHistory, slug },
       });
+      const usageStatus = (chat as { blocked?: boolean; usage?: { status?: string } } | null)?.usage?.status;
+      const isBlocked = (chat as { blocked?: boolean } | null)?.blocked === true
+        || (usageStatus && usageStatus !== "ok");
+      if (isBlocked) {
+        setStatus("idle");
+        if (usageStatus === "expired") onBlocked("expired");
+        else if (usageStatus === "monthly_blocked") onBlocked("monthly");
+        else onBlocked("daily");
+        return;
+      }
       if (cErr || chat?.error) throw new Error(cErr?.message || chat?.error);
       const reply: string = (chat?.reply || "").trim();
       setHistory((h) => [...h, { role: "assistant", content: reply }]);
