@@ -7,7 +7,7 @@ Deno.serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY no configurada");
 
-    const { audio } = await req.json();
+    const { audio, mime } = await req.json();
     if (!audio) {
       return new Response(JSON.stringify({ error: "audio requerido" }), {
         status: 400,
@@ -20,8 +20,14 @@ Deno.serve(async (req) => {
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
+    const inputMime: string = (mime || "audio/webm").toString();
+    const ext = inputMime.includes("mp4") ? "mp4"
+      : inputMime.includes("wav") ? "wav"
+      : inputMime.includes("mpeg") ? "mp3"
+      : inputMime.includes("ogg") ? "ogg"
+      : "webm";
     const form = new FormData();
-    form.append("file", new Blob([bytes], { type: "audio/webm" }), "audio.webm");
+    form.append("file", new Blob([bytes], { type: inputMime }), `audio.${ext}`);
     form.append("model", "whisper-1");
     form.append("language", "es");
 
