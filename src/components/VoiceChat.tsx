@@ -1,35 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Mic, Square, RotateCcw } from "lucide-react";
+import { Mic, Square } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { clearPet, loadPet, type Pet } from "@/lib/petStorage";
+import type { Pet } from "@/lib/petStorage";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 
 type Status = "idle" | "recording" | "processing" | "speaking";
-
 interface Msg { role: "user" | "assistant"; content: string }
 
-const Voice = () => {
-  const navigate = useNavigate();
-  const [pet, setPet] = useState<Pet | null>(null);
+interface Props { pet: Pet }
+
+const VoiceChat = ({ pet }: Props) => {
   const [status, setStatus] = useState<Status>("idle");
-  const [hint, setHint] = useState("Toca el micrófono para hablar");
   const [history, setHistory] = useState<Msg[]>([]);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    const p = loadPet();
-    if (!p) {
-      navigate("/", { replace: true });
-      return;
-    }
-    setPet(p);
-  }, [navigate]);
 
   useEffect(() => {
     return () => {
@@ -50,7 +38,6 @@ const Voice = () => {
     });
 
   const startRecording = async () => {
-    if (!pet) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -62,7 +49,6 @@ const Voice = () => {
       mediaRecorderRef.current = recorder;
       recorder.start();
       setStatus("recording");
-      setHint("Estoy escuchándote...");
     } catch (err) {
       console.error(err);
       toast.error("No pude acceder al micrófono");
@@ -75,14 +61,11 @@ const Voice = () => {
   };
 
   const handleStop = async () => {
-    if (!pet) return;
     setStatus("processing");
-    setHint("Pensando...");
     try {
       const blob = new Blob(chunksRef.current, { type: "audio/webm" });
       if (blob.size < 800) {
         setStatus("idle");
-        setHint("No te escuché, intenta de nuevo");
         return;
       }
       const audioB64 = await blobToBase64(blob);
@@ -94,7 +77,6 @@ const Voice = () => {
       const userText: string = (trans?.text || "").trim();
       if (!userText) {
         setStatus("idle");
-        setHint("No te escuché, intenta de nuevo");
         return;
       }
 
@@ -109,7 +91,6 @@ const Voice = () => {
       setHistory((h) => [...h, { role: "assistant", content: reply }]);
 
       setStatus("speaking");
-      setHint(reply);
 
       const { data: voice, error: vErr } = await supabase.functions.invoke("tts", {
         body: { text: reply, sex: pet.sex },
@@ -119,20 +100,13 @@ const Voice = () => {
       const audioUrl = `data:${voice.mime || "audio/mpeg"};base64,${voice.audio}`;
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
-      audio.onended = () => {
-        setStatus("idle");
-        setHint("Toca el micrófono para hablar");
-      };
-      audio.onerror = () => {
-        setStatus("idle");
-        setHint("Toca el micrófono para hablar");
-      };
+      audio.onended = () => setStatus("idle");
+      audio.onerror = () => setStatus("idle");
       await audio.play();
     } catch (err) {
       console.error(err);
       toast.error("Algo salió mal, intenta de nuevo");
       setStatus("idle");
-      setHint("Toca el micrófono para hablar");
     }
   };
 
@@ -141,28 +115,12 @@ const Voice = () => {
     else if (status === "idle") startRecording();
   };
 
-  const reset = () => {
-    audioRef.current?.pause();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    clearPet();
-    navigate("/", { replace: true });
-  };
-
   const isRecording = status === "recording";
   const isBusy = status === "processing" || status === "speaking";
 
   return (
     <main className="min-h-screen bg-hero flex flex-col items-center justify-between px-5 py-10 relative">
-      <header className="w-full flex items-center justify-end max-w-md">
-        <button
-          onClick={reset}
-          className="text-foreground/60 hover:text-foreground/90 transition-colors text-xs font-medium flex items-center gap-1.5 px-3 py-2 rounded-full border border-foreground/15"
-          aria-label="Perfil de la mascota"
-        >
-          <RotateCcw size={14} />
-          Perfil de la mascota
-        </button>
-      </header>
+      <header className="w-full max-w-md" />
 
       <section className="flex-1 flex flex-col items-center justify-center w-full max-w-md gap-16">
         <img
@@ -213,4 +171,4 @@ const Voice = () => {
   );
 };
 
-export default Voice;
+export default VoiceChat;

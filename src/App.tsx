@@ -3,9 +3,8 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Onboarding from "./pages/Onboarding";
-import Voice from "./pages/Voice";
-import NotFound from "./pages/NotFound.tsx";
+import Home from "./pages/Home";
+import PetSlug from "./pages/PetSlug";
 
 const queryClient = new QueryClient();
 
@@ -16,9 +15,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Onboarding />} />
-          <Route path="/voice" element={<Voice />} />
-          <Route path="*" element={<NotFound />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/:slug" element={<PetSlug />} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
