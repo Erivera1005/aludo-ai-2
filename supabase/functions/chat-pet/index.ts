@@ -1,4 +1,5 @@
 import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 interface PetData {
   name: string;
@@ -48,10 +49,36 @@ Deno.serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY no configurada");
 
-    const { pet, messages } = await req.json();
+    const { pet, messages, slug } = await req.json();
     if (!pet?.name || !pet?.animal_type) {
       return new Response(JSON.stringify({ error: "Datos de mascota incompletos" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!slug || typeof slug !== "string") {
+      return new Response(JSON.stringify({ error: "slug requerido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Per-slug usage enforcement (server-side, can't be bypassed from client)
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+    const { data: usage, error: usageErr } = await admin.rpc("consume_pet_usage", { _slug: slug });
+    if (usageErr) {
+      console.error("consume_pet_usage error", usageErr);
+      return new Response(JSON.stringify({ error: "No se pudo validar el uso" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const status = (usage as { status?: string })?.status;
+    if (status !== "ok") {
+      return new Response(JSON.stringify({ blocked: true, usage }), {
+        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
