@@ -192,24 +192,37 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
 
       setStatus("speaking");
 
-      const { data: voice, error: vErr } = await supabase.functions.invoke("tts", {
-        body: { text: reply, sex: pet.sex },
+      // Fetch TTS as raw binary (mp3) instead of base64 JSON: ~33% smaller, no decode step => audio plays sooner.
+      const ttsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tts`;
+      const ttsResp = await fetch(ttsUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ text: reply, sex: pet.sex }),
       });
-      if (vErr || voice?.error) {
-        console.error("[VoiceChat] tts error", vErr, voice);
-        throw new Error(vErr?.message || voice?.error);
+      if (!ttsResp.ok) {
+        console.error("[VoiceChat] tts http error", ttsResp.status);
+        throw new Error("tts failed");
       }
-
-      const audioUrl = `data:${voice.mime || "audio/mpeg"};base64,${voice.audio}`;
+      const audioBlob = await ttsResp.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
       const el = audioElRef.current;
       if (!el) {
+        URL.revokeObjectURL(audioUrl);
         setStatus("idle");
         return;
       }
       el.src = audioUrl;
-      el.onended = () => setStatus("idle");
+      el.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        setStatus("idle");
+      };
       el.onerror = (e) => {
         console.error("[VoiceChat] audio playback error", e);
+        URL.revokeObjectURL(audioUrl);
         setStatus("idle");
       };
       try {
@@ -217,6 +230,7 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       } catch (playErr) {
         console.error("[VoiceChat] audio.play() failed", playErr);
         toast.error("Toca el botón otra vez para escuchar la respuesta");
+        URL.revokeObjectURL(audioUrl);
         setStatus("idle");
       }
     } catch (err) {

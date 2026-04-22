@@ -98,6 +98,7 @@ Deno.serve(async (req) => {
           ...(messages || []),
         ],
         temperature: 0.85,
+        max_tokens: 120,
       }),
     });
 
