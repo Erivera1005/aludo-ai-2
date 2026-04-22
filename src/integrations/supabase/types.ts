@@ -26,6 +26,7 @@ export type Database = {
           owner_contact: string | null
           owner_name: string | null
           sex: string | null
+          slug: string | null
         }
         Insert: {
           age?: string | null
@@ -38,6 +39,7 @@ export type Database = {
           owner_contact?: string | null
           owner_name?: string | null
           sex?: string | null
+          slug?: string | null
         }
         Update: {
           age?: string | null
@@ -50,6 +52,7 @@ export type Database = {
           owner_contact?: string | null
           owner_name?: string | null
           sex?: string | null
+          slug?: string | null
         }
         Relationships: []
       }
