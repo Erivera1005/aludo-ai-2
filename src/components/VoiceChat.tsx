@@ -86,11 +86,13 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       const { data: chat, error: cErr } = await supabase.functions.invoke("chat-pet", {
         body: { pet, messages: newHistory, slug },
       });
-      const blockedStatus = (chat as { blocked?: boolean; usage?: { status?: string } } | null)?.usage?.status;
-      if ((chat as { blocked?: boolean } | null)?.blocked || blockedStatus) {
+      const usageStatus = (chat as { blocked?: boolean; usage?: { status?: string } } | null)?.usage?.status;
+      const isBlocked = (chat as { blocked?: boolean } | null)?.blocked === true
+        || (usageStatus && usageStatus !== "ok");
+      if (isBlocked) {
         setStatus("idle");
-        if (blockedStatus === "expired") onBlocked("expired");
-        else if (blockedStatus === "monthly_blocked") onBlocked("monthly");
+        if (usageStatus === "expired") onBlocked("expired");
+        else if (usageStatus === "monthly_blocked") onBlocked("monthly");
         else onBlocked("daily");
         return;
       }
