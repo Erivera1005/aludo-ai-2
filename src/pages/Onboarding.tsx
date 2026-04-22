@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { savePet, type Pet } from "@/lib/petStorage";
 import { toast } from "sonner";
-import logo from "@/assets/logo.jpeg";
+import logo from "@/assets/logo.png";
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -24,8 +24,8 @@ const Onboarding = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.animal_type.trim()) {
-      toast.error("Nombre y tipo de animal son obligatorios");
+    if (!form.name.trim() || !form.animal_type.trim() || !form.sex) {
+      toast.error("Nombre, tipo de animal y sexo son obligatorios");
       return;
     }
     setSubmitting(true);
@@ -73,13 +73,14 @@ const Onboarding = () => {
           <Field label="Raza" value={form.breed} onChange={set("breed")} placeholder="Opcional" />
 
           <div>
-            <label className="block text-foreground/70 text-xs mb-1.5 ml-1">Sexo</label>
+            <label className="block text-foreground/70 text-xs mb-1.5 ml-1">Sexo *</label>
             <select
               value={form.sex}
               onChange={set("sex")}
+              required
               className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-3 text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-accent-blue-glow/60 transition-colors"
             >
-              <option value="" className="bg-brand-deep">Opcional</option>
+              <option value="" className="bg-brand-deep">Selecciona</option>
               <option value="macho" className="bg-brand-deep">Macho</option>
               <option value="hembra" className="bg-brand-deep">Hembra</option>
             </select>
