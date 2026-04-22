@@ -10,6 +10,25 @@ interface Msg { role: "user" | "assistant"; content: string }
 
 interface Props { pet: Pet; slug: string; onBlocked: (variant: "daily" | "monthly" | "expired") => void }
 
+// Detect Safari / iOS
+const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isSafari = typeof navigator !== "undefined" &&
+  /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+
+// Pick a recording mime supported by the current browser. Safari supports mp4.
+const pickRecordingMime = (): string => {
+  if (typeof MediaRecorder === "undefined") return "";
+  const candidates = isIOS || isSafari
+    ? ["audio/mp4", "audio/mp4;codecs=mp4a.40.2", "audio/wav", "audio/webm"]
+    : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/wav"];
+  for (const c of candidates) {
+    try {
+      if (MediaRecorder.isTypeSupported(c)) return c;
+    } catch { /* ignore */ }
+  }
+  return "";
+};
+
 const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
   const [status, setStatus] = useState<Status>("idle");
   const [history, setHistory] = useState<Msg[]>([]);
@@ -17,14 +36,54 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioUnlockedRef = useRef(false);
+  const recordMimeRef = useRef<string>("");
 
+  // Pre-create the <audio> element so we can reuse it (required for iOS autoplay policies)
   useEffect(() => {
+    const el = document.createElement("audio");
+    el.preload = "auto";
+    el.setAttribute("playsinline", "true");
+    audioElRef.current = el;
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
-      audioRef.current?.pause();
+      try { audioElRef.current?.pause(); } catch { /* noop */ }
+      try { audioCtxRef.current?.close(); } catch { /* noop */ }
     };
   }, []);
+
+  // Unlock audio playback on the FIRST user gesture (required for Safari iOS)
+  const unlockAudio = async () => {
+    if (audioUnlockedRef.current) return;
+    try {
+      const Ctx = (window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext
+        || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (Ctx && !audioCtxRef.current) {
+        audioCtxRef.current = new Ctx();
+      }
+      if (audioCtxRef.current?.state === "suspended") {
+        await audioCtxRef.current.resume();
+      }
+      // Prime the <audio> element with a tiny silent mp3 so subsequent .play() works without a fresh gesture
+      const el = audioElRef.current;
+      if (el) {
+        el.muted = true;
+        el.src = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//FJAhEhU3F2sahUIu7gI5VBEZQjr/TI3Cnu3eDyHLBrmJsCRbr+cYrV5QIO9NLU8qqPg6q0okLYK9Mh3nnkOEXdG4ZIWaWJ4M8tTo6CpzQRXlHDPyCAwf2KoFmZuTI4eIuhDpNJxlHMq2mnNYy+jjMA9Q3wmtmgLkUnmpjlmGSJ55kIIWDdRQYFJBXGgWZPPgtDBNnjbXNlvL0V6whL2IVFsZ8sM41NRC5TNPCxd9e1OvJrYf81mWsB+T0yRJrgcRtDPN1+G/XDUJyJyUgBBIVy9LYkPACNDDXaQUbsZRpnRdF7M2kx9cYj+/9rXkAFSGAxgCKICRZkw+IzcyJpmBoKE2cFYhKzgCKLN4tBEKKCx3pdFrxbY//tSxA8DR2QrSm09JEjBhWiBpiGwm+CwUUCblm0eiIjoNzd1xN6ZN8x4juL8RlqcG0/YcGRREVWfWcIuzMxIgxQEWdyhI8j8ICy+hQAEcEbhXyWjBgUJgg4GWXJYyOJYAlgrdCk+rNT5Ucvr46ymO99fScsOKDV3PYEJWG2/n0bDoIu+OaO//1QQDIDwgUByMhxg4VRjdBxjsZ6XYSO5HwjBNkJEVB12YLJxhA9NYVkS1U3//Jv3//7d3lAhAFJOl70DxoAJDPQAEFh1B5IRvwYkPlIEFAQQp46wEhJxIFDAyMCb8aBkIUtNiZeb3cjWZ2/3OXavl8/jXq30/FQiR06Ji+/3I2UBjYJgwygsBKYBwHKkAZHQGAuSeHhEAY4tNRBHCvmEmZA+RWQs2D5CldJqu5gFgRxjEkmWYzIqGDBIlc/3fTMV3eAEoAYE3eDsTkdi6KXM55ggwIu//7UsQOA8jcCT5OPSNJD4CnBcekaIGGCKIQDsuiMxDCSAcRf4QBmwOIzL4IOgUMVj7s6ofahsMq5xEGcnFL81wjElFeegkNWO6uGIShgxbFLyXiUYXSk0XRCsAkEGAxNN2ImAtENB60FRJBFY6wSWDmUOPNJqiMc5K2ZKeMVqDawgRWVgbNOY0Ob/WhgMtwt8nZIyNJsAQGXAYg4gJlIMwJzIYPC1k5UlLBGTMfBYKaB6QURllrA+AwjqI8wQRQ23VCRwCS7BVWizUJYZsbkSCOSvCO5x1HOCm6JwvqHrz1uUgCx40hyfqGJTM1MPGZAQH3gIGNAEgZkD2HBkRZGRKHpAkTFIQDDEsnVktCY0PjUW9JUGRKawnRD5Qk1szGZsnhmeLpxRxPOEAS5YxJYHPnqV3cT0vdDoX3rl5NgGE0cAhGw0cFsg5Kk+OAyDBoEN6L5gkCmS0X9JnX/+1LEFAPJDFVAjjzjyTILqJ3JCHUYgUUTnFgCVc3CSWMypOFRRbn0e2WJ6ueZmEW0bvGUBjmGu9AolyQk8ZiPoMHZPlwaQqq0pAgZyXPIAgfkBGEwjoljNCJgaIHUTYi1ETI0R2jyOl5wWSyTLB0Ujx6jmaUKzrr5WHmESjzPnnwfeIfYemHmw2tmqg0eqSVIB3Y8vGUXjBwkSURDhcHRWCCZElECIQYhO61VSGxchcQRgwQRDKFxZEh0c4xZMQU1FMy45OS41VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV";
+        try {
+          await el.play();
+        } catch { /* may still need a tap, that's fine */ }
+        el.pause();
+        el.muted = false;
+        el.removeAttribute("src");
+        el.load();
+      }
+      audioUnlockedRef.current = true;
+    } catch (e) {
+      console.warn("[VoiceChat] unlockAudio failed", e);
+    }
+  };
 
   const blobToBase64 = (blob: Blob) =>
     new Promise<string>((resolve, reject) => {
@@ -39,10 +98,27 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
 
   const startRecording = async () => {
     try {
+      console.log("[VoiceChat] requesting mic", { isIOS, isSafari, ua: navigator.userAgent });
+      if (!navigator.mediaDevices?.getUserMedia) {
+        toast.error("Tu navegador no soporta micrófono");
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+
+      const mimeType = pickRecordingMime();
+      recordMimeRef.current = mimeType || "audio/webm";
+      console.log("[VoiceChat] using mime", recordMimeRef.current);
+
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      } catch (err) {
+        console.warn("[VoiceChat] MediaRecorder mime failed, falling back", err);
+        recorder = new MediaRecorder(stream);
+        recordMimeRef.current = recorder.mimeType || "audio/mp4";
+      }
+
       chunksRef.current = [];
       recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       recorder.onstop = () => handleStop();
@@ -50,20 +126,28 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       recorder.start();
       setStatus("recording");
     } catch (err) {
-      console.error(err);
-      toast.error("No pude acceder al micrófono");
+      console.error("[VoiceChat] mic error", err);
+      const name = (err as { name?: string })?.name || "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        toast.error("Necesitamos acceso al micrófono para hablar contigo 🐾");
+      } else if (name === "NotFoundError") {
+        toast.error("No encontramos un micrófono en tu dispositivo");
+      } else {
+        toast.error("No pude acceder al micrófono");
+      }
     }
   };
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
+    try { mediaRecorderRef.current?.stop(); } catch (e) { console.warn(e); }
     streamRef.current?.getTracks().forEach((t) => t.stop());
   };
 
   const handleStop = async () => {
     setStatus("processing");
     try {
-      const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+      const recordedMime = recordMimeRef.current || "audio/webm";
+      const blob = new Blob(chunksRef.current, { type: recordedMime });
       if (blob.size < 800) {
         setStatus("idle");
         return;
@@ -71,9 +155,12 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       const audioB64 = await blobToBase64(blob);
 
       const { data: trans, error: tErr } = await supabase.functions.invoke("transcribe", {
-        body: { audio: audioB64 },
+        body: { audio: audioB64, mime: recordedMime },
       });
-      if (tErr || trans?.error) throw new Error(tErr?.message || trans?.error);
+      if (tErr || trans?.error) {
+        console.error("[VoiceChat] transcribe error", tErr, trans);
+        throw new Error(tErr?.message || trans?.error);
+      }
       const userText: string = (trans?.text || "").trim();
       if (!userText) {
         setStatus("idle");
@@ -96,7 +183,10 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
         else onBlocked("daily");
         return;
       }
-      if (cErr || chat?.error) throw new Error(cErr?.message || chat?.error);
+      if (cErr || chat?.error) {
+        console.error("[VoiceChat] chat error", cErr, chat);
+        throw new Error(cErr?.message || chat?.error);
+      }
       const reply: string = (chat?.reply || "").trim();
       setHistory((h) => [...h, { role: "assistant", content: reply }]);
 
@@ -105,22 +195,40 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       const { data: voice, error: vErr } = await supabase.functions.invoke("tts", {
         body: { text: reply, sex: pet.sex },
       });
-      if (vErr || voice?.error) throw new Error(vErr?.message || voice?.error);
+      if (vErr || voice?.error) {
+        console.error("[VoiceChat] tts error", vErr, voice);
+        throw new Error(vErr?.message || voice?.error);
+      }
 
       const audioUrl = `data:${voice.mime || "audio/mpeg"};base64,${voice.audio}`;
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-      audio.onended = () => setStatus("idle");
-      audio.onerror = () => setStatus("idle");
-      await audio.play();
+      const el = audioElRef.current;
+      if (!el) {
+        setStatus("idle");
+        return;
+      }
+      el.src = audioUrl;
+      el.onended = () => setStatus("idle");
+      el.onerror = (e) => {
+        console.error("[VoiceChat] audio playback error", e);
+        setStatus("idle");
+      };
+      try {
+        await el.play();
+      } catch (playErr) {
+        console.error("[VoiceChat] audio.play() failed", playErr);
+        toast.error("Toca el botón otra vez para escuchar la respuesta");
+        setStatus("idle");
+      }
     } catch (err) {
-      console.error(err);
-      toast.error("Algo salió mal, intenta de nuevo");
+      console.error("[VoiceChat] handleStop failed", err);
+      toast.error("Algo salió mal, intenta nuevamente");
       setStatus("idle");
     }
   };
 
-  const onMicClick = () => {
+  const onMicClick = async () => {
+    // Always unlock audio on user gesture (Safari iOS requirement)
+    await unlockAudio();
     if (status === "recording") stopRecording();
     else if (status === "idle") startRecording();
   };
@@ -151,9 +259,14 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
 
           <button
             onClick={onMicClick}
+            onTouchEnd={(e) => {
+              // On iOS, ensure the gesture is captured even if click is flaky
+              e.preventDefault();
+              onMicClick();
+            }}
             disabled={isBusy}
             aria-label={isRecording ? "Detener" : "Hablar"}
-            className={`relative w-32 h-32 rounded-full bg-mic shadow-mic flex items-center justify-center text-white transition-all active:scale-95 disabled:opacity-70 ${
+            className={`relative w-32 h-32 rounded-full bg-mic shadow-mic flex items-center justify-center text-white transition-all active:scale-95 disabled:opacity-70 touch-manipulation select-none ${
               status === "speaking" ? "animate-soft-pulse" : ""
             }`}
           >
