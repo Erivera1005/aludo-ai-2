@@ -116,7 +116,7 @@ const OnboardingForm = ({ slug, onCreated }: Props) => {
 
           <Field label="Edad *" value={form.age} onChange={set("age")} placeholder="2 años" required />
           <Field label="Nombre del dueño *" value={form.owner_name} onChange={set("owner_name")} placeholder="Tu nombre" required />
-          <Field label="Contacto del dueño *" value={form.owner_contact} onChange={set("owner_contact")} placeholder="Teléfono" required />
+          <Field label="Información de contacto en caso de pérdida *" value={form.owner_contact} onChange={set("owner_contact")} placeholder="Teléfono, correo, red social, etc." required />
           <Field label="Alergias" value={form.allergies} onChange={set("allergies")} placeholder="Opcional" />
 
           <button
