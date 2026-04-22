@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content ?? "";
 
-    return new Response(JSON.stringify({ reply }), {
+    return new Response(JSON.stringify({ reply, usage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
