@@ -1,5 +1,6 @@
 export interface Pet {
   id: string;
+  slug: string;
   name: string;
   animal_type: string;
   breed?: string | null;
@@ -10,19 +11,19 @@ export interface Pet {
   allergies?: string | null;
 }
 
-const KEY = "aludo:pet";
+const keyFor = (slug: string) => `aludo:pet:${slug.toLowerCase()}`;
 
 export const savePet = (pet: Pet) => {
-  try { localStorage.setItem(KEY, JSON.stringify(pet)); } catch {}
+  try { localStorage.setItem(keyFor(pet.slug), JSON.stringify(pet)); } catch {}
 };
 
-export const loadPet = (): Pet | null => {
+export const loadPet = (slug: string): Pet | null => {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(keyFor(slug));
     return raw ? (JSON.parse(raw) as Pet) : null;
   } catch { return null; }
 };
 
-export const clearPet = () => {
-  try { localStorage.removeItem(KEY); } catch {}
+export const clearPet = (slug: string) => {
+  try { localStorage.removeItem(keyFor(slug)); } catch {}
 };

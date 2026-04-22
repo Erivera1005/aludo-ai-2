@@ -1,12 +1,15 @@
 import { useState, FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { savePet, type Pet } from "@/lib/petStorage";
+import type { Pet } from "@/lib/petStorage";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 
-const Onboarding = () => {
-  const navigate = useNavigate();
+interface Props {
+  slug: string;
+  onCreated: (pet: Pet) => void;
+}
+
+const OnboardingForm = ({ slug, onCreated }: Props) => {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -31,6 +34,7 @@ const Onboarding = () => {
     setSubmitting(true);
     try {
       const payload = {
+        slug,
         name: form.name.trim(),
         animal_type: form.animal_type.trim(),
         breed: form.breed.trim() || null,
@@ -45,9 +49,22 @@ const Onboarding = () => {
         .insert(payload)
         .select()
         .single();
-      if (error) throw error;
-      savePet(data as Pet);
-      navigate("/voice", { replace: true });
+      if (error) {
+        // If slug already exists (race condition), reload it
+        if (error.code === "23505") {
+          const { data: existing } = await supabase
+            .from("pets")
+            .select("*")
+            .ilike("slug", slug)
+            .maybeSingle();
+          if (existing) {
+            onCreated(existing as unknown as Pet);
+            return;
+          }
+        }
+        throw error;
+      }
+      onCreated(data as unknown as Pet);
     } catch (err) {
       console.error(err);
       toast.error("No pudimos guardar tu mascota. Intenta de nuevo.");
@@ -63,8 +80,11 @@ const Onboarding = () => {
         <h1 className="text-foreground text-2xl font-semibold text-center mb-2">
           Cuéntame de tu mascota
         </h1>
-        <p className="text-foreground/60 text-sm text-center mb-8">
+        <p className="text-foreground/60 text-sm text-center mb-2">
           En segundos podrás hablar con ella
+        </p>
+        <p className="text-foreground/40 text-xs text-center mb-8">
+          Este perfil quedará guardado en <span className="text-foreground/70">/{slug}</span>
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -127,4 +147,4 @@ const Field = ({
   </div>
 );
 
-export default Onboarding;
+export default OnboardingForm;
