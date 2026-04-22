@@ -96,9 +96,9 @@ const OnboardingForm = ({ slug, onCreated }: Props) => {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <Field label="Nombre *" value={form.name} onChange={set("name")} placeholder="Luna" />
-          <Field label="Tipo de animal *" value={form.animal_type} onChange={set("animal_type")} placeholder="Perro, gato, conejo..." />
-          <Field label="Raza" value={form.breed} onChange={set("breed")} placeholder="Opcional" />
+          <Field label="Nombre *" value={form.name} onChange={set("name")} placeholder="Luna" required />
+          <Field label="Tipo de animal *" value={form.animal_type} onChange={set("animal_type")} placeholder="Perro, gato, conejo..." required />
+          <Field label="Raza *" value={form.breed} onChange={set("breed")} placeholder="Labrador, mestizo..." required />
 
           <div>
             <label className="block text-foreground/70 text-xs mb-1.5 ml-1">Sexo *</label>
@@ -114,9 +114,9 @@ const OnboardingForm = ({ slug, onCreated }: Props) => {
             </select>
           </div>
 
-          <Field label="Edad" value={form.age} onChange={set("age")} placeholder="2 años" />
-          <Field label="Nombre del dueño" value={form.owner_name} onChange={set("owner_name")} placeholder="Opcional" />
-          <Field label="Contacto del dueño" value={form.owner_contact} onChange={set("owner_contact")} placeholder="Teléfono opcional" />
+          <Field label="Edad *" value={form.age} onChange={set("age")} placeholder="2 años" required />
+          <Field label="Nombre del dueño *" value={form.owner_name} onChange={set("owner_name")} placeholder="Tu nombre" required />
+          <Field label="Contacto del dueño *" value={form.owner_contact} onChange={set("owner_contact")} placeholder="Teléfono" required />
           <Field label="Alergias" value={form.allergies} onChange={set("allergies")} placeholder="Opcional" />
 
           <button
@@ -142,6 +142,7 @@ const Field = ({
   value: string;
   onChange: React.ChangeEventHandler<HTMLInputElement>;
   placeholder?: string;
+  required?: boolean;
 }) => (
   <div>
     <label className="block text-foreground/70 text-xs mb-1.5 ml-1">{label}</label>
@@ -150,6 +151,7 @@ const Field = ({
       value={value}
       onChange={onChange}
       placeholder={placeholder}
+      required={required}
       className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-3 text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-accent-blue-glow/60 transition-colors"
     />
   </div>
