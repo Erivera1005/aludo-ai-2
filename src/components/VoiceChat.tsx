@@ -40,12 +40,15 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioUnlockedRef = useRef(false);
   const recordMimeRef = useRef<string>("");
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   // Pre-create the <audio> element so we can reuse it (required for iOS autoplay policies)
   useEffect(() => {
     const el = document.createElement("audio");
     el.preload = "auto";
     el.setAttribute("playsinline", "true");
+    el.volume = 1.0;
     audioElRef.current = el;
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -66,9 +69,29 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       if (audioCtxRef.current?.state === "suspended") {
         await audioCtxRef.current.resume();
       }
+      // Route the <audio> through a GainNode so we can boost volume on mobile.
+      // On iOS this also forces playback through the main (loud) speaker
+      // instead of the quiet earpiece.
+      try {
+        const ctx = audioCtxRef.current;
+        const el = audioElRef.current;
+        if (ctx && el && !sourceNodeRef.current) {
+          const src = ctx.createMediaElementSource(el);
+          const gain = ctx.createGain();
+          // Boost: mobile gets a stronger gain than desktop
+          gain.gain.value = (isIOS || isSafari) ? 2.5 : 1.5;
+          src.connect(gain);
+          gain.connect(ctx.destination);
+          sourceNodeRef.current = src;
+          gainNodeRef.current = gain;
+        }
+      } catch (e) {
+        console.warn("[VoiceChat] could not wire gain node", e);
+      }
       // Prime the <audio> element with a tiny silent mp3 so subsequent .play() works without a fresh gesture
-      const el = audioElRef.current;
-      if (el) {
+      const audioEl = audioElRef.current;
+      if (audioEl) {
+        const el = audioEl;
         el.muted = true;
         el.src = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//FJAhEhU3F2sahUIu7gI5VBEZQjr/TI3Cnu3eDyHLBrmJsCRbr+cYrV5QIO9NLU8qqPg6q0okLYK9Mh3nnkOEXdG4ZIWaWJ4M8tTo6CpzQRXlHDPyCAwf2KoFmZuTI4eIuhDpNJxlHMq2mnNYy+jjMA9Q3wmtmgLkUnmpjlmGSJ55kIIWDdRQYFJBXGgWZPPgtDBNnjbXNlvL0V6whL2IVFsZ8sM41NRC5TNPCxd9e1OvJrYf81mWsB+T0yRJrgcRtDPN1+G/XDUJyJyUgBBIVy9LYkPACNDDXaQUbsZRpnRdF7M2kx9cYj+/9rXkAFSGAxgCKICRZkw+IzcyJpmBoKE2cFYhKzgCKLN4tBEKKCx3pdFrxbY//tSxA8DR2QrSm09JEjBhWiBpiGwm+CwUUCblm0eiIjoNzd1xN6ZN8x4juL8RlqcG0/YcGRREVWfWcIuzMxIgxQEWdyhI8j8ICy+hQAEcEbhXyWjBgUJgg4GWXJYyOJYAlgrdCk+rNT5Ucvr46ymO99fScsOKDV3PYEJWG2/n0bDoIu+OaO//1QQDIDwgUByMhxg4VRjdBxjsZ6XYSO5HwjBNkJEVB12YLJxhA9NYVkS1U3//Jv3//7d3lAhAFJOl70DxoAJDPQAEFh1B5IRvwYkPlIEFAQQp46wEhJxIFDAyMCb8aBkIUtNiZeb3cjWZ2/3OXavl8/jXq30/FQiR06Ji+/3I2UBjYJgwygsBKYBwHKkAZHQGAuSeHhEAY4tNRBHCvmEmZA+RWQs2D5CldJqu5gFgRxjEkmWYzIqGDBIlc/3fTMV3eAEoAYE3eDsTkdi6KXM55ggwIu//7UsQOA8jcCT5OPSNJD4CnBcekaIGGCKIQDsuiMxDCSAcRf4QBmwOIzL4IOgUMVj7s6ofahsMq5xEGcnFL81wjElFeegkNWO6uGIShgxbFLyXiUYXSk0XRCsAkEGAxNN2ImAtENB60FRJBFY6wSWDmUOPNJqiMc5K2ZKeMVqDawgRWVgbNOY0Ob/WhgMtwt8nZIyNJsAQGXAYg4gJlIMwJzIYPC1k5UlLBGTMfBYKaB6QURllrA+AwjqI8wQRQ23VCRwCS7BVWizUJYZsbkSCOSvCO5x1HOCm6JwvqHrz1uUgCx40hyfqGJTM1MPGZAQH3gIGNAEgZkD2HBkRZGRKHpAkTFIQDDEsnVktCY0PjUW9JUGRKawnRD5Qk1szGZsnhmeLpxRxPOEAS5YxJYHPnqV3cT0vdDoX3rl5NgGE0cAhGw0cFsg5Kk+OAyDBoEN6L5gkCmS0X9JnX/+1LEFAPJDFVAjjzjyTILqJ3JCHUYgUUTnFgCVc3CSWMypOFRRbn0e2WJ6ueZmEW0bvGUBjmGu9AolyQk8ZiPoMHZPlwaQqq0pAgZyXPIAgfkBGEwjoljNCJgaIHUTYi1ETI0R2jyOl5wWSyTLB0Ujx6jmaUKzrr5WHmESjzPnnwfeIfYemHmw2tmqg0eqSVIB3Y8vGUXjBwkSURDhcHRWCCZElECIQYhO61VSGxchcQRgwQRDKFxZEh0c4xZMQU1FMy45OS41VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV";
         try {
