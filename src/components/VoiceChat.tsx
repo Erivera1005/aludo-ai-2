@@ -286,20 +286,26 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       el.currentTime = 0;
       el.src = audioUrl;
       el.volume = 1;
-      el.onended = () => setStatus("idle");
+      el.onended = () => {
+        void setAudioSessionType("auto");
+        setStatus("idle");
+      };
       el.onerror = (e) => {
         console.error("[VoiceChat] audio playback error", e);
+        void setAudioSessionType("auto");
         setStatus("idle");
       };
       try {
         await el.play();
       } catch (playErr) {
         console.error("[VoiceChat] audio.play() failed", playErr);
+        void setAudioSessionType("auto");
         toast.error("Toca el botón otra vez para escuchar la respuesta");
         setStatus("idle");
       }
     } catch (err) {
       console.error("[VoiceChat] handleStop failed", err);
+      void setAudioSessionType("auto");
       toast.error("Algo salió mal, intenta nuevamente");
       setStatus("idle");
     }
