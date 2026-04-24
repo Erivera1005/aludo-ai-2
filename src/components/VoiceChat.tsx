@@ -29,6 +29,17 @@ const pickRecordingMime = (): string => {
   return "";
 };
 
+type AudioSessionKind = "auto" | "playback" | "play-and-record";
+
+const setAudioSessionType = async (type: AudioSessionKind) => {
+  try {
+    const nav = navigator as Navigator & { audioSession?: { type: AudioSessionKind } };
+    if (nav.audioSession) nav.audioSession.type = type;
+  } catch (e) {
+    console.warn("[VoiceChat] could not set audioSession", type, e);
+  }
+};
+
 const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
   const [status, setStatus] = useState<Status>("idle");
   const [history, setHistory] = useState<Msg[]>([]);
@@ -126,7 +137,25 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
         toast.error("Tu navegador no soporta micrófono");
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      await setAudioSessionType("play-and-record");
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: isIOS || isSafari
+            ? {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+                channelCount: 1,
+              }
+            : true,
+        });
+      } catch (err) {
+        console.warn("[VoiceChat] constrained getUserMedia failed, falling back", err);
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
       streamRef.current = stream;
 
       const mimeType = pickRecordingMime();
@@ -164,6 +193,7 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
   const stopRecording = () => {
     try { mediaRecorderRef.current?.stop(); } catch (e) { console.warn(e); }
     streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
   };
 
   const handleStop = async () => {
@@ -242,6 +272,7 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
         setStatus("idle");
         return;
       }
+      await setAudioSessionType("playback");
       // Resume the AudioContext if it was suspended between plays (mobile/Safari).
       // Without this, the GainNode chain stays silent on the 2nd+ playback.
       try {
@@ -251,21 +282,30 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       } catch (e) {
         console.warn("[VoiceChat] could not resume audio context", e);
       }
+      el.pause();
+      el.currentTime = 0;
       el.src = audioUrl;
-      el.onended = () => setStatus("idle");
+      el.volume = 1;
+      el.onended = () => {
+        void setAudioSessionType("auto");
+        setStatus("idle");
+      };
       el.onerror = (e) => {
         console.error("[VoiceChat] audio playback error", e);
+        void setAudioSessionType("auto");
         setStatus("idle");
       };
       try {
         await el.play();
       } catch (playErr) {
         console.error("[VoiceChat] audio.play() failed", playErr);
+        void setAudioSessionType("auto");
         toast.error("Toca el botón otra vez para escuchar la respuesta");
         setStatus("idle");
       }
     } catch (err) {
       console.error("[VoiceChat] handleStop failed", err);
+      void setAudioSessionType("auto");
       toast.error("Algo salió mal, intenta nuevamente");
       setStatus("idle");
     }
