@@ -40,12 +40,15 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioUnlockedRef = useRef(false);
   const recordMimeRef = useRef<string>("");
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   // Pre-create the <audio> element so we can reuse it (required for iOS autoplay policies)
   useEffect(() => {
     const el = document.createElement("audio");
     el.preload = "auto";
     el.setAttribute("playsinline", "true");
+    el.volume = 1.0;
     audioElRef.current = el;
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -65,6 +68,25 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       }
       if (audioCtxRef.current?.state === "suspended") {
         await audioCtxRef.current.resume();
+      }
+      // Route the <audio> through a GainNode so we can boost volume on mobile.
+      // On iOS this also forces playback through the main (loud) speaker
+      // instead of the quiet earpiece.
+      try {
+        const ctx = audioCtxRef.current;
+        const el = audioElRef.current;
+        if (ctx && el && !sourceNodeRef.current) {
+          const src = ctx.createMediaElementSource(el);
+          const gain = ctx.createGain();
+          // Boost: mobile gets a stronger gain than desktop
+          gain.gain.value = (isIOS || isSafari) ? 2.5 : 1.5;
+          src.connect(gain);
+          gain.connect(ctx.destination);
+          sourceNodeRef.current = src;
+          gainNodeRef.current = gain;
+        }
+      } catch (e) {
+        console.warn("[VoiceChat] could not wire gain node", e);
       }
       // Prime the <audio> element with a tiny silent mp3 so subsequent .play() works without a fresh gesture
       const el = audioElRef.current;
