@@ -262,11 +262,13 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
     }
   };
 
-  const onMicClick = async () => {
-    // Always unlock audio on user gesture (Safari iOS requirement)
-    await unlockAudio();
+  const onMicClick = () => {
+    // Fire-and-forget: unlocking audio must happen during the user gesture,
+    // but we must NOT await it — awaiting breaks the gesture context on mobile
+    // (getUserMedia silently fails / first click does nothing).
+    void unlockAudio();
     if (status === "recording") stopRecording();
-    else if (status === "idle") startRecording();
+    else if (status === "idle") void startRecording();
   };
 
   const isRecording = status === "recording";
