@@ -242,6 +242,15 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
         setStatus("idle");
         return;
       }
+      // Resume the AudioContext if it was suspended between plays (mobile/Safari).
+      // Without this, the GainNode chain stays silent on the 2nd+ playback.
+      try {
+        if (audioCtxRef.current?.state === "suspended") {
+          await audioCtxRef.current.resume();
+        }
+      } catch (e) {
+        console.warn("[VoiceChat] could not resume audio context", e);
+      }
       el.src = audioUrl;
       el.onended = () => setStatus("idle");
       el.onerror = (e) => {
