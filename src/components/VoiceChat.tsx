@@ -15,6 +15,20 @@ const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(naviga
 const isSafari = typeof navigator !== "undefined" &&
   /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
 
+// Pick a recording mime supported by the current browser. Safari supports mp4.
+const pickRecordingMime = (): string => {
+  if (typeof MediaRecorder === "undefined") return "";
+  const candidates = isIOS || isSafari
+    ? ["audio/mp4", "audio/mp4;codecs=mp4a.40.2", "audio/wav", "audio/webm"]
+    : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/wav"];
+  for (const c of candidates) {
+    try {
+      if (MediaRecorder.isTypeSupported(c)) return c;
+    } catch { /* ignore */ }
+  }
+  return "";
+};
+
 type AudioSessionKind = "auto" | "playback" | "play-and-record";
 
 const setAudioSessionType = async (type: AudioSessionKind) => {
@@ -26,37 +40,17 @@ const setAudioSessionType = async (type: AudioSessionKind) => {
   }
 };
 
-// Web Speech API typings (browsers vary)
-type SpeechRecognitionLike = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  maxAlternatives: number;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onerror: ((e: { error?: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-};
-
-const getSpeechRecognitionCtor = (): (new () => SpeechRecognitionLike) | null => {
-  const w = window as unknown as {
-    SpeechRecognition?: new () => SpeechRecognitionLike;
-    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-  };
-  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
-};
-
 const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
   const [status, setStatus] = useState<Status>("idle");
   const [history, setHistory] = useState<Msg[]>([]);
 
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const transcriptRef = useRef<string>("");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioUnlockedRef = useRef(false);
+  const recordMimeRef = useRef<string>("");
   const gainNodeRef = useRef<GainNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
@@ -68,7 +62,7 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
     el.volume = 1.0;
     audioElRef.current = el;
     return () => {
-      try { recognitionRef.current?.abort(); } catch { /* noop */ }
+      streamRef.current?.getTracks().forEach((t) => t.stop());
       try { audioElRef.current?.pause(); } catch { /* noop */ }
       try { audioCtxRef.current?.close(); } catch { /* noop */ }
     };
@@ -125,63 +119,102 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
     }
   };
 
+  const blobToBase64 = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        resolve(result.split(",")[1] || "");
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
   const startRecording = async () => {
     try {
-      const Ctor = getSpeechRecognitionCtor();
-      if (!Ctor) {
-        toast.error("Tu navegador no soporta reconocimiento de voz. Usa Chrome o Safari.");
+      console.log("[VoiceChat] requesting mic", { isIOS, isSafari, ua: navigator.userAgent });
+      if (!navigator.mediaDevices?.getUserMedia) {
+        toast.error("Tu navegador no soporta micrófono");
         return;
       }
+
       await setAudioSessionType("play-and-record");
 
-      const rec = new Ctor();
-      rec.lang = "es-ES";
-      rec.interimResults = false;
-      rec.continuous = false;
-      rec.maxAlternatives = 1;
-      transcriptRef.current = "";
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: isIOS || isSafari
+            ? {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+                channelCount: 1,
+              }
+            : true,
+        });
+      } catch (err) {
+        console.warn("[VoiceChat] constrained getUserMedia failed, falling back", err);
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      streamRef.current = stream;
 
-      rec.onresult = (e) => {
-        let text = "";
-        for (let i = 0; i < e.results.length; i++) {
-          text += e.results[i][0]?.transcript || "";
-        }
-        transcriptRef.current = text.trim();
-      };
-      rec.onerror = (e) => {
-        console.error("[VoiceChat] speech error", e?.error);
-        const err = e?.error || "";
-        if (err === "not-allowed" || err === "service-not-allowed") {
-          toast.error("Necesitamos acceso al micrófono para hablar contigo 🐾");
-        } else if (err === "no-speech") {
-          // silencioso
-        } else if (err) {
-          toast.error("No pude escucharte, intenta de nuevo");
-        }
-        setStatus("idle");
-      };
-      rec.onend = () => {
-        void handleStop();
-      };
+      const mimeType = pickRecordingMime();
+      recordMimeRef.current = mimeType || "audio/webm";
+      console.log("[VoiceChat] using mime", recordMimeRef.current);
 
-      recognitionRef.current = rec;
-      rec.start();
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      } catch (err) {
+        console.warn("[VoiceChat] MediaRecorder mime failed, falling back", err);
+        recorder = new MediaRecorder(stream);
+        recordMimeRef.current = recorder.mimeType || "audio/mp4";
+      }
+
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.onstop = () => handleStop();
+      mediaRecorderRef.current = recorder;
+      recorder.start();
       setStatus("recording");
     } catch (err) {
-      console.error("[VoiceChat] startRecording error", err);
-      toast.error("No pude iniciar el micrófono");
-      setStatus("idle");
+      console.error("[VoiceChat] mic error", err);
+      const name = (err as { name?: string })?.name || "";
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        toast.error("Necesitamos acceso al micrófono para hablar contigo 🐾");
+      } else if (name === "NotFoundError") {
+        toast.error("No encontramos un micrófono en tu dispositivo");
+      } else {
+        toast.error("No pude acceder al micrófono");
+      }
     }
   };
 
   const stopRecording = () => {
-    try { recognitionRef.current?.stop(); } catch (e) { console.warn(e); }
+    try { mediaRecorderRef.current?.stop(); } catch (e) { console.warn(e); }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
   };
 
   const handleStop = async () => {
     setStatus("processing");
     try {
-      const userText: string = (transcriptRef.current || "").trim();
+      const recordedMime = recordMimeRef.current || "audio/webm";
+      const blob = new Blob(chunksRef.current, { type: recordedMime });
+      if (blob.size < 800) {
+        setStatus("idle");
+        return;
+      }
+      const audioB64 = await blobToBase64(blob);
+
+      const { data: trans, error: tErr } = await supabase.functions.invoke("transcribe", {
+        body: { audio: audioB64, mime: recordedMime },
+      });
+      if (tErr || trans?.error) {
+        console.error("[VoiceChat] transcribe error", tErr, trans);
+        throw new Error(tErr?.message || trans?.error);
+      }
+      const userText: string = (trans?.text || "").trim();
       if (!userText) {
         setStatus("idle");
         return;

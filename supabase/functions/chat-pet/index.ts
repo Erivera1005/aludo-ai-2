@@ -46,8 +46,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY no configurada");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY no configurada");
 
     const { pet, messages, slug } = await req.json();
     if (!pet?.name || !pet?.animal_type) {
@@ -85,28 +85,25 @@ Deno.serve(async (req) => {
 
     const systemPrompt = buildSystemPrompt(pet);
 
-    const contents = (messages || []).map((m: { role: string; content: string }) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
-
-    const model = "gemini-3.1-pro-preview";
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents,
-          generationConfig: { temperature: 0.85 },
-        }),
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...(messages || []),
+        ],
+        temperature: 0.85,
+      }),
+    });
 
     if (!response.ok) {
       const t = await response.text();
-      console.error("Gemini chat error", response.status, t);
+      console.error("OpenAI chat error", response.status, t);
       return new Response(JSON.stringify({ error: "Error en la respuesta del modelo" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -114,8 +111,7 @@ Deno.serve(async (req) => {
     }
 
     const data = await response.json();
-    const reply: string =
-      data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") ?? "";
+    const reply = data.choices?.[0]?.message?.content ?? "";
 
     return new Response(JSON.stringify({ reply, usage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
