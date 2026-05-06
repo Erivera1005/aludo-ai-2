@@ -20,6 +20,10 @@ Deno.serve(async (req) => {
     const isFemale = ["hembra", "femenino", "mujer", "female", "f"].some((k) => normalizedSex.includes(k));
     const voice = isFemale ? "marin" : "ash";
 
+    // Prepend a short pause so the TTS engine doesn't clip the first phoneme/word
+    // (notable at higher speeds and on mobile Safari MP3 decoders).
+    const safeInput = `… ${String(text).trim()}`;
+
     const response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: {
@@ -29,7 +33,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: "gpt-4o-mini-tts",
         voice,
-        input: text,
+        input: safeInput,
         speed: 2.0,
         instructions: "Habla con un acento latinoamericano cálido, tierno y natural. Tono cariñoso y cercano.",
         response_format: "mp3",
