@@ -32,9 +32,7 @@ Deno.serve(async (req) => {
         input: text,
         speed: 2.0,
         instructions: "Habla con un acento latinoamericano cálido, tierno y natural. Tono cariñoso y cercano.",
-        // wav decodifica más rápido en Safari iOS que mp3 (sin pasar por el
-        // decodificador de audio comprimido), reduciendo el "time to first sound".
-        response_format: "wav",
+        response_format: "mp3",
       }),
     });
 
