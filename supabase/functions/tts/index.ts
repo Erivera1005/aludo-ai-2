@@ -20,9 +20,9 @@ Deno.serve(async (req) => {
     const isFemale = ["hembra", "femenino", "mujer", "female", "f"].some((k) => normalizedSex.includes(k));
     const voice = isFemale ? "marin" : "ash";
 
-    // Prepend a short pause so the TTS engine doesn't clip the first phoneme/word
-    // (notable at higher speeds and on mobile Safari MP3 decoders).
-    const safeInput = `… ${String(text).trim()}`;
+    // Prepend a longer pause so mobile Safari doesn't clip the first word when
+    // reusing the <audio> element (the first ~300-500ms can be swallowed at speed=2.0).
+    const safeInput = `... ... ... ${String(text).trim()}`;
 
     const response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",

@@ -296,6 +296,21 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
         setStatus("idle");
       };
       try {
+        // Force the element to load the new source before playing. Without this,
+        // mobile Safari often starts playback before the decoder is ready and
+        // clips the first ~300-500ms (cutting the first word).
+        el.load();
+        await new Promise<void>((resolve) => {
+          const onReady = () => {
+            el.removeEventListener("canplaythrough", onReady);
+            el.removeEventListener("loadeddata", onReady);
+            resolve();
+          };
+          el.addEventListener("canplaythrough", onReady, { once: true });
+          el.addEventListener("loadeddata", onReady, { once: true });
+          // Safety timeout in case events don't fire
+          setTimeout(onReady, 400);
+        });
         await el.play();
       } catch (playErr) {
         console.error("[VoiceChat] audio.play() failed", playErr);
