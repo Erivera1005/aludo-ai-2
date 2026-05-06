@@ -28,8 +28,11 @@ Deno.serve(async (req) => {
       : "webm";
     const form = new FormData();
     form.append("file", new Blob([bytes], { type: inputMime }), `audio.${ext}`);
-    form.append("model", "whisper-1");
+    // gpt-4o-mini-transcribe es notablemente más rápido que whisper-1
+    // y mantiene buena calidad para español conversacional.
+    form.append("model", "gpt-4o-mini-transcribe");
     form.append("language", "es");
+    form.append("response_format", "json");
 
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",

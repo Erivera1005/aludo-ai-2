@@ -27,11 +27,13 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini-tts",
+        // tts-1 tiene latencia ~3x menor que gpt-4o-mini-tts
+        // y mantiene las mismas voces (ash / marin no existen en tts-1,
+        // así que mapeamos a voces equivalentes con tono similar).
+        model: "tts-1",
         voice,
         input: text,
-        speed: 2.0,
-        instructions: "Habla con un acento latinoamericano cálido, tierno y natural. Tono cariñoso y cercano.",
+        speed: 1.15,
         response_format: "mp3",
       }),
     });
