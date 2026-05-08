@@ -254,19 +254,27 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
         throw new Error((cErr as Error)?.message || chatBody?.error || "chat failed");
       }
       const reply: string = (chatBody?.reply || "").trim();
+      const inlineAudio: string | undefined = typeof chatBody?.audio === "string" ? chatBody.audio : undefined;
+      const inlineMime: string | undefined = typeof chatBody?.mime === "string" ? chatBody.mime : undefined;
       setHistory((h) => [...h, { role: "assistant", content: reply }]);
 
       setStatus("speaking");
 
-      const { data: voice, error: vErr } = await supabase.functions.invoke("tts", {
-        body: { text: reply, sex: pet.sex },
-      });
-      if (vErr || voice?.error) {
-        console.error("[VoiceChat] tts error", vErr, voice);
-        throw new Error(vErr?.message || voice?.error);
+      let voiceData: { audio?: string; mime?: string; error?: string } | null = null;
+      if (inlineAudio) {
+        voiceData = { audio: inlineAudio, mime: inlineMime || "audio/mpeg" };
+      } else {
+        const { data: voice, error: vErr } = await supabase.functions.invoke("tts", {
+          body: { text: reply, sex: pet.sex },
+        });
+        if (vErr || voice?.error) {
+          console.error("[VoiceChat] tts error", vErr, voice);
+          throw new Error(vErr?.message || voice?.error);
+        }
+        voiceData = voice as typeof voiceData;
       }
 
-      const audioUrl = `data:${voice.mime || "audio/mpeg"};base64,${voice.audio}`;
+      const audioUrl = `data:${voiceData?.mime || "audio/mpeg"};base64,${voiceData?.audio}`;
       const el = audioElRef.current;
       if (!el) {
         setStatus("idle");
