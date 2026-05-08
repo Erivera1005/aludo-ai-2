@@ -4,6 +4,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const startedAt = Date.now();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY no configurada");
 
@@ -50,6 +51,11 @@ Deno.serve(async (req) => {
     }
 
     const data = await response.json();
+    console.log("[transcribe] ok", {
+      elapsed_ms: Date.now() - startedAt,
+      text_chars: String(data.text || "").length,
+      mime: inputMime,
+    });
     return new Response(JSON.stringify({ text: data.text || "" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
