@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const startedAt = Date.now();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY no configurada");
 
@@ -112,6 +113,12 @@ Deno.serve(async (req) => {
 
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content ?? "";
+    console.log("[chat-pet] ok", {
+      slug,
+      elapsed_ms: Date.now() - startedAt,
+      reply_chars: reply.length,
+      history_count: Array.isArray(messages) ? messages.length : 0,
+    });
 
     return new Response(JSON.stringify({ reply, usage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
