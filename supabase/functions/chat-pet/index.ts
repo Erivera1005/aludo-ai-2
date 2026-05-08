@@ -1,5 +1,6 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 interface PetData {
   name: string;
@@ -10,6 +11,12 @@ interface PetData {
   owner_name?: string | null;
   owner_contact?: string | null;
   allergies?: string | null;
+}
+
+function pickVoice(sex?: string | null): "marin" | "ash" {
+  const normalizedSex = (sex || "").toString().toLowerCase();
+  const isFemale = ["hembra", "femenino", "mujer", "female", "f"].some((k) => normalizedSex.includes(k));
+  return isFemale ? "marin" : "ash";
 }
 
 function buildSystemPrompt(pet: PetData): string {
@@ -98,6 +105,7 @@ Deno.serve(async (req) => {
           { role: "system", content: systemPrompt },
           ...(messages || []),
         ],
+        max_completion_tokens: 80,
         temperature: 0.85,
       }),
     });
@@ -113,14 +121,48 @@ Deno.serve(async (req) => {
 
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content ?? "";
+    let audio: string | undefined;
+    let mime: string | undefined;
+
+    if (reply) {
+      try {
+        const ttsResponse = await fetch("https://api.openai.com/v1/audio/speech", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini-tts",
+            voice: pickVoice(pet.sex),
+            input: `... ... ... ${String(reply).trim()}`,
+            speed: 2.0,
+            instructions: "Habla con un acento latinoamericano cálido, tierno y natural. Tono cariñoso y cercano.",
+            response_format: "mp3",
+          }),
+        });
+
+        if (ttsResponse.ok) {
+          const buffer = await ttsResponse.arrayBuffer();
+          audio = base64Encode(new Uint8Array(buffer));
+          mime = "audio/mpeg";
+        } else {
+          console.error("[chat-pet] inline tts error", ttsResponse.status, await ttsResponse.text());
+        }
+      } catch (ttsError) {
+        console.error("[chat-pet] inline tts failed", ttsError);
+      }
+    }
+
     console.log("[chat-pet] ok", {
       slug,
       elapsed_ms: Date.now() - startedAt,
       reply_chars: reply.length,
       history_count: Array.isArray(messages) ? messages.length : 0,
+      inline_tts: Boolean(audio),
     });
 
-    return new Response(JSON.stringify({ reply, usage }), {
+    return new Response(JSON.stringify({ reply, usage, audio, mime }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
