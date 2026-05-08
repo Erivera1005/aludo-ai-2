@@ -228,7 +228,14 @@ const VoiceChat = ({ pet, slug, onBlocked }: Props) => {
       });
       // When the edge function returns 403, supabase-js puts the JSON body
       // in `cErr.context` (a Response). Read it to detect block reasons.
-      let chatBody: { blocked?: boolean; usage?: { status?: string }; reply?: string; error?: string } | null =
+      let chatBody: {
+        blocked?: boolean;
+        usage?: { status?: string };
+        reply?: string;
+        error?: string;
+        audio?: string;
+        mime?: string;
+      } | null =
         (chat as typeof chatBody) ?? null;
       if (cErr) {
         try {
