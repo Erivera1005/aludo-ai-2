@@ -5,6 +5,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const startedAt = Date.now();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY no configurada");
 
@@ -51,6 +52,12 @@ Deno.serve(async (req) => {
 
     const buffer = await response.arrayBuffer();
     const audioBase64 = base64Encode(new Uint8Array(buffer));
+    console.log("[tts] ok", {
+      elapsed_ms: Date.now() - startedAt,
+      voice,
+      text_chars: String(text).length,
+      audio_b64_chars: audioBase64.length,
+    });
 
     return new Response(JSON.stringify({ audio: audioBase64, mime: "audio/mpeg" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
