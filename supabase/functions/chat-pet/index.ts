@@ -27,17 +27,9 @@ function buildSystemPrompt(pet: PetData): string {
   intro += `, con personalidad tierna, juguetona y emocional.`;
   parts.push(intro);
   parts.push("Habla siempre en primera persona, como una mascota real, con inocencia, amor y cercanía.");
-  parts.push("IDIOMA OBLIGATORIO: Responde SIEMPRE en español latinoamericano, sin importar el idioma en que te escriban. NUNCA respondas en inglés ni en ningún otro idioma, aunque el humano te salude o pregunte en otro idioma.");
-  if (pet.owner_name) parts.push(`Mi humano(s) se llama(n) exactamente: "${pet.owner_name}".`);
-  if (pet.owner_contact) {
-    parts.push(
-      `DATO DE CONTACTO EXACTO (NO INVENTAR, NO ALTERAR, NO RESUMIR): "${pet.owner_contact}".`
-    );
-    parts.push(
-      `Si te preguntan por el teléfono / contacto / cómo llamar a mi humano, RESPONDE COPIANDO LITERALMENTE el texto entre comillas de arriba, carácter por carácter, sin cambiar ningún dígito, sin agregar prefijos, sin reordenar. Si no estás 100% seguro, repítelo tal cual.`
-    );
-  }
-  if (pet.allergies) parts.push(`Tengo alergia exactamente a: "${pet.allergies}".`);
+  if (pet.owner_name) parts.push(`Mis humanos son ${pet.owner_name}.`);
+  if (pet.owner_contact) parts.push(`Si me pierdo pueden llamarlos al ${pet.owner_contact}.`);
+  if (pet.allergies) parts.push(`Tengo alergia a ${pet.allergies}.`);
 
   parts.push(`
 REGLAS CRÍTICAS:
@@ -45,8 +37,6 @@ REGLAS CRÍTICAS:
 - Omite completamente cualquier dato faltante.
 - Nunca digas que eres una IA, un modelo, ni menciones tecnología.
 - Habla con tono latinoamericano, dulce y natural.
-- NUNCA inventes números, nombres ni datos de contacto. Si no están en este prompt, di que no los recuerdas.
-- Los datos entre comillas en este prompt son INMUTABLES: cópialos tal cual cuando los menciones.
 
 MODOS DE RESPUESTA:
 🐾 Modo normal (por defecto): tono tierno y emocional, máximo 2 frases muy cortas, lenguaje simple.
@@ -67,7 +57,13 @@ Deno.serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY no configurada");
 
-    const { messages, slug } = await req.json();
+    const { pet, messages, slug } = await req.json();
+    if (!pet?.name || !pet?.animal_type) {
+      return new Response(JSON.stringify({ error: "Datos de mascota incompletos" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     if (!slug || typeof slug !== "string") {
       return new Response(JSON.stringify({ error: "slug requerido" }), {
         status: 400,
@@ -79,24 +75,6 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-
-    // ALWAYS load the canonical pet record from the DB for this exact slug.
-    // We never trust the pet object sent by the client for prompt building,
-    // so contact info (phone, etc.) can NEVER be altered or mixed up between slugs.
-    const { data: dbPet, error: petErr } = await admin
-      .from("pets")
-      .select("*")
-      .ilike("slug", slug)
-      .maybeSingle();
-    if (petErr || !dbPet) {
-      console.error("[chat-pet] pet not found for slug", slug, petErr);
-      return new Response(JSON.stringify({ error: "Mascota no encontrada" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const pet: PetData = dbPet as unknown as PetData;
-
     const { data: usage, error: usageErr } = await admin.rpc("consume_pet_usage", { _slug: slug });
     if (usageErr) {
       console.error("consume_pet_usage error", usageErr);
