@@ -1,4 +1,1 @@
 project_id = "ulgvexemawcwzudkmspd"
-
-[functions.tts-realtime]
-verify_jwt = false
