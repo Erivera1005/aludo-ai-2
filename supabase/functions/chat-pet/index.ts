@@ -1,6 +1,6 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { synthesizeWithGemini } from "../_shared/gemini-tts.ts";
 
 interface PetData {
   name: string;
@@ -11,12 +11,6 @@ interface PetData {
   owner_name?: string | null;
   owner_contact?: string | null;
   allergies?: string | null;
-}
-
-function pickVoice(sex?: string | null): "marin" | "ash" {
-  const normalizedSex = (sex || "").toString().toLowerCase();
-  const isFemale = ["hembra", "femenino", "mujer", "female", "f"].some((k) => normalizedSex.includes(k));
-  return isFemale ? "marin" : "ash";
 }
 
 function buildSystemPrompt(pet: PetData): string {
@@ -141,28 +135,10 @@ Deno.serve(async (req) => {
 
     if (reply) {
       try {
-        const ttsResponse = await fetch("https://api.openai.com/v1/audio/speech", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini-tts",
-            voice: pickVoice(canonicalPet.sex),
-            input: `... ... ... ${String(reply).trim()}`,
-            speed: 2.0,
-            instructions: "Habla con un acento latinoamericano cálido, tierno y natural. Tono cariñoso y cercano.",
-            response_format: "mp3",
-          }),
-        });
-
-        if (ttsResponse.ok) {
-          const buffer = await ttsResponse.arrayBuffer();
-          audio = base64Encode(new Uint8Array(buffer));
-          mime = "audio/mpeg";
-        } else {
-          console.error("[chat-pet] inline tts error", ttsResponse.status, await ttsResponse.text());
+        const result = await synthesizeWithGemini(String(reply), canonicalPet.sex);
+        if (result) {
+          audio = result.audioB64;
+          mime = result.mime;
         }
       } catch (ttsError) {
         console.error("[chat-pet] inline tts failed", ttsError);
