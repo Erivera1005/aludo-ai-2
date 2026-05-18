@@ -13,12 +13,6 @@ interface PetData {
   allergies?: string | null;
 }
 
-function pickVoice(sex?: string | null): "marin" | "ash" {
-  const normalizedSex = (sex || "").toString().toLowerCase();
-  const isFemale = ["hembra", "femenino", "mujer", "female", "f"].some((k) => normalizedSex.includes(k));
-  return isFemale ? "marin" : "ash";
-}
-
 function buildSystemPrompt(pet: PetData): string {
   const parts: string[] = [];
   let intro = `Actúa como ${pet.name}, un(a) ${pet.animal_type}`;
