@@ -58,12 +58,6 @@ Deno.serve(async (req) => {
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY no configurada");
 
     const { pet, messages, slug } = await req.json();
-    if (!pet?.name || !pet?.animal_type) {
-      return new Response(JSON.stringify({ error: "Datos de mascota incompletos" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
     if (!slug || typeof slug !== "string") {
       return new Response(JSON.stringify({ error: "slug requerido" }), {
         status: 400,
@@ -75,6 +69,27 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+
+    // ALWAYS load canonical pet data from DB by slug. The client-provided `pet`
+    // may be stale (old localStorage cache from before form changes, different
+    // tab, etc.). This guarantees the system prompt matches what the user
+    // actually filled in the form, on every single response.
+    const { data: dbPet, error: petErr } = await admin
+      .from("pets")
+      .select("*")
+      .ilike("slug", slug)
+      .maybeSingle();
+    if (petErr) {
+      console.error("[chat-pet] pet lookup error", petErr);
+    }
+    const canonicalPet: PetData | null = (dbPet as PetData | null) ?? (pet ?? null);
+    if (!canonicalPet?.name || !canonicalPet?.animal_type) {
+      return new Response(JSON.stringify({ error: "Datos de mascota incompletos" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data: usage, error: usageErr } = await admin.rpc("consume_pet_usage", { _slug: slug });
     if (usageErr) {
       console.error("consume_pet_usage error", usageErr);
@@ -91,7 +106,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const systemPrompt = buildSystemPrompt(pet);
+    const systemPrompt = buildSystemPrompt(canonicalPet);
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -134,7 +149,7 @@ Deno.serve(async (req) => {
           },
           body: JSON.stringify({
             model: "gpt-4o-mini-tts",
-            voice: pickVoice(pet.sex),
+            voice: pickVoice(canonicalPet.sex),
             input: `... ... ... ${String(reply).trim()}`,
             speed: 2.0,
             instructions: "Habla con un acento latinoamericano cálido, tierno y natural. Tono cariñoso y cercano.",
