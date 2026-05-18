@@ -1,0 +1,1 @@
+UPDATE public.pets SET daily_usage_count = 0, usage_day_index = 0, is_blocked = false, last_used_date = NULL, first_use_at = NULL;
