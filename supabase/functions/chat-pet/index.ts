@@ -141,28 +141,10 @@ Deno.serve(async (req) => {
 
     if (reply) {
       try {
-        const ttsResponse = await fetch("https://api.openai.com/v1/audio/speech", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini-tts",
-            voice: pickVoice(canonicalPet.sex),
-            input: `... ... ... ${String(reply).trim()}`,
-            speed: 2.0,
-            instructions: "Habla con un acento latinoamericano cálido, tierno y natural. Tono cariñoso y cercano.",
-            response_format: "mp3",
-          }),
-        });
-
-        if (ttsResponse.ok) {
-          const buffer = await ttsResponse.arrayBuffer();
-          audio = base64Encode(new Uint8Array(buffer));
-          mime = "audio/mpeg";
-        } else {
-          console.error("[chat-pet] inline tts error", ttsResponse.status, await ttsResponse.text());
+        const result = await synthesizeWithGemini(String(reply), canonicalPet.sex);
+        if (result) {
+          audio = result.audioB64;
+          mime = result.mime;
         }
       } catch (ttsError) {
         console.error("[chat-pet] inline tts failed", ttsError);
