@@ -31,6 +31,7 @@ export type Database = {
           owner_name: string | null
           sex: string | null
           slug: string | null
+          total_usage_count: number
           usage_day_index: number
         }
         Insert: {
@@ -49,6 +50,7 @@ export type Database = {
           owner_name?: string | null
           sex?: string | null
           slug?: string | null
+          total_usage_count?: number
           usage_day_index?: number
         }
         Update: {
@@ -67,6 +69,7 @@ export type Database = {
           owner_name?: string | null
           sex?: string | null
           slug?: string | null
+          total_usage_count?: number
           usage_day_index?: number
         }
         Relationships: []
