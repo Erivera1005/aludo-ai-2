@@ -27,7 +27,7 @@ const PetSlug = () => {
         setState("ready");
       }
       const { data, error } = await supabase
-        .from("pets")
+        .from("pets_public")
         .select("*")
         .ilike("slug", normalizedSlug)
         .maybeSingle();
