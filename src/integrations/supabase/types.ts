@@ -31,6 +31,7 @@ export type Database = {
           owner_name: string | null
           sex: string | null
           slug: string | null
+          total_usage_count: number
           usage_day_index: number
         }
         Insert: {
@@ -49,6 +50,7 @@ export type Database = {
           owner_name?: string | null
           sex?: string | null
           slug?: string | null
+          total_usage_count?: number
           usage_day_index?: number
         }
         Update: {
@@ -67,13 +69,67 @@ export type Database = {
           owner_name?: string | null
           sex?: string | null
           slug?: string | null
+          total_usage_count?: number
           usage_day_index?: number
         }
         Relationships: []
       }
     }
     Views: {
-      [_ in never]: never
+      pets_public: {
+        Row: {
+          age: string | null
+          allergies: string | null
+          animal_type: string | null
+          breed: string | null
+          created_at: string | null
+          daily_usage_count: number | null
+          first_use_at: string | null
+          id: string | null
+          is_blocked: boolean | null
+          last_used_date: string | null
+          name: string | null
+          sex: string | null
+          slug: string | null
+          total_usage_count: number | null
+          usage_day_index: number | null
+        }
+        Insert: {
+          age?: string | null
+          allergies?: string | null
+          animal_type?: string | null
+          breed?: string | null
+          created_at?: string | null
+          daily_usage_count?: number | null
+          first_use_at?: string | null
+          id?: string | null
+          is_blocked?: boolean | null
+          last_used_date?: string | null
+          name?: string | null
+          sex?: string | null
+          slug?: string | null
+          total_usage_count?: number | null
+          usage_day_index?: number | null
+        }
+        Update: {
+          age?: string | null
+          allergies?: string | null
+          animal_type?: string | null
+          breed?: string | null
+          created_at?: string | null
+          daily_usage_count?: number | null
+          first_use_at?: string | null
+          id?: string | null
+          is_blocked?: boolean | null
+          last_used_date?: string | null
+          name?: string | null
+          sex?: string | null
+          slug?: string | null
+          total_usage_count?: number | null
+          usage_day_index?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       consume_pet_usage: { Args: { _slug: string }; Returns: Json }

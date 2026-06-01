@@ -52,27 +52,23 @@ const OnboardingForm = ({ slug, onCreated }: Props) => {
         owner_contact: form.owner_contact.trim() || null,
         allergies: form.allergies.trim() || null,
       };
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("pets")
-        .insert(payload)
-        .select()
-        .single();
-      if (error) {
-        // If slug already exists (race condition), reload it
-        if (error.code === "23505") {
-          const { data: existing } = await supabase
-            .from("pets")
-            .select("*")
-            .ilike("slug", slug)
-            .maybeSingle();
-          if (existing) {
-            onCreated(existing as unknown as Pet);
-            return;
-          }
-        }
+        .insert(payload);
+      if (error && error.code !== "23505") {
         throw error;
       }
-      onCreated(data as unknown as Pet);
+      // Re-fetch from the safe public view (owner contact stays server-side only)
+      const { data: created } = await supabase
+        .from("pets_public")
+        .select("*")
+        .ilike("slug", slug)
+        .maybeSingle();
+      if (created) {
+        onCreated(created as unknown as Pet);
+        return;
+      }
+      throw error ?? new Error("No se pudo crear la mascota");
     } catch (err) {
       console.error(err);
       toast.error("No pudimos guardar tu mascota. Intenta de nuevo.");
