@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, Square } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Pet } from "@/lib/petStorage";
+import type { Pet } from "@/lib/petTypes";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 

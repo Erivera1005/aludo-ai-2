@@ -1,6 +1,6 @@
 import { useState, FormEvent } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Pet } from "@/lib/petStorage";
+import type { Pet } from "@/lib/petTypes";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 

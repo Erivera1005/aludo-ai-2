@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { loadPet, savePet, type Pet } from "@/lib/petStorage";
+import type { Pet } from "@/lib/petTypes";
 import OnboardingForm from "@/components/OnboardingForm";
 import VoiceChat from "@/components/VoiceChat";
 import UsageBlocked from "@/components/UsageBlocked";
@@ -21,11 +21,7 @@ const PetSlug = () => {
     let cancelled = false;
     const run = async () => {
       if (!normalizedSlug) return;
-      const cached = loadPet(normalizedSlug);
-      if (cached) {
-        setPet(cached);
-        setState("ready");
-      }
+      setState("loading");
       const { data, error } = await supabase
         .from("pets")
         .select("*")
@@ -33,15 +29,14 @@ const PetSlug = () => {
         .maybeSingle();
       if (cancelled) return;
       if (error) {
-        if (!cached) setState("create");
+        setState("create");
         return;
       }
       if (data) {
         const p = data as unknown as Pet;
-        savePet(p);
         setPet(p);
         setState("ready");
-      } else if (!cached) {
+      } else {
         setState("create");
       }
     };
@@ -50,7 +45,6 @@ const PetSlug = () => {
   }, [normalizedSlug]);
 
   const handleCreated = (p: Pet) => {
-    savePet(p);
     setPet(p);
     setState("ready");
   };
