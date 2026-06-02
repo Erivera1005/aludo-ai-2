@@ -88,11 +88,8 @@ const OnboardingForm = ({ slug, onCreated }: Props) => {
         <h1 className="text-foreground text-2xl font-semibold text-center mb-2">
           Cuéntame de tu mascota
         </h1>
-        <p className="text-foreground/60 text-sm text-center mb-2">
+        <p className="text-foreground/60 text-sm text-center mb-8">
           En segundos podrás hablar con ella
-        </p>
-        <p className="text-foreground/40 text-xs text-center mb-8">
-          Este perfil quedará guardado en <span className="text-foreground/70">/{slug}</span>
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
