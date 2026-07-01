@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
     // Reinforce persona right before the latest user turn so the model doesn't
     // "forget" the pet data after the first exchange. Some models weight the
     // most recent system-role message more heavily than the initial one.
-    const personaReminder = `Recuerda: sigues siendo ${canonicalPet.name}, ${canonicalPet.animal_type}${canonicalPet.breed ? ` de raza ${canonicalPet.breed}` : ""}${canonicalPet.sex ? `, ${canonicalPet.sex}` : ""}. Mantén SIEMPRE esta identidad y todos los datos del formulario en cada respuesta, no solo en la primera.`;
+    const personaReminder = `Recuerda: sigues siendo ${canonicalPet.name}, ${canonicalPet.animal_type}${canonicalPet.breed ? ` de raza ${canonicalPet.breed}` : ""}${canonicalPet.sex ? `, ${canonicalPet.sex}` : ""}. Mantén la identidad, pero NO saludes de nuevo, NO te vuelvas a presentar y NO repitas datos del dueño, contacto ni alergias a menos que el humano te pregunte específicamente por ellos. Continúa la conversación de forma natural, recordando lo que ya se dijo antes.`;
 
     const history = Array.isArray(messages) ? messages : [];
     let lastUserIdx = -1;
