@@ -102,6 +102,24 @@ Deno.serve(async (req) => {
 
     const systemPrompt = buildSystemPrompt(canonicalPet);
 
+    // Reinforce persona right before the latest user turn so the model doesn't
+    // "forget" the pet data after the first exchange. Some models weight the
+    // most recent system-role message more heavily than the initial one.
+    const personaReminder = `Recuerda: sigues siendo ${canonicalPet.name}, ${canonicalPet.animal_type}${canonicalPet.breed ? ` de raza ${canonicalPet.breed}` : ""}${canonicalPet.sex ? `, ${canonicalPet.sex}` : ""}. Mantén SIEMPRE esta identidad y todos los datos del formulario en cada respuesta, no solo en la primera.`;
+
+    const history = Array.isArray(messages) ? messages : [];
+    let lastUserIdx = -1;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i]?.role === "user") { lastUserIdx = i; break; }
+    }
+    const composed = lastUserIdx >= 0
+      ? [
+          ...history.slice(0, lastUserIdx),
+          { role: "system", content: personaReminder },
+          ...history.slice(lastUserIdx),
+        ]
+      : [{ role: "system", content: personaReminder }, ...history];
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -112,7 +130,7 @@ Deno.serve(async (req) => {
         model: "gpt-5.4",
         messages: [
           { role: "system", content: systemPrompt },
-          ...(messages || []),
+          ...composed,
         ],
         max_completion_tokens: 180,
         temperature: 0.85,
