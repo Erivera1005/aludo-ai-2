@@ -127,13 +127,14 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-5.4",
+        model: "gpt-5.6-terra",
         messages: [
           { role: "system", content: systemPrompt },
           ...composed,
         ],
         max_completion_tokens: 180,
         temperature: 0.85,
+        reasoning_effort: "none",
       }),
     });
 
